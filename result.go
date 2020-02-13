@@ -15,8 +15,13 @@ func newAttempt(success bool, err error) *Attempt {
 }
 
 type Result struct {
-	attemptList []*Attempt
+	task        Task
 	successful  bool
+	attemptList []*Attempt
+}
+
+func (result *Result) GetTask() Task {
+	return result.task
 }
 
 func (result *Result) IsSuccessful() bool {
@@ -43,9 +48,10 @@ func (result *Result) GetTimeStampMs() int64 {
 	return result.attemptList[cursor].TimeStampMs
 }
 
-func initResult() *Result {
+func initResult(t Task) *Result {
 	return &Result{
 		attemptList: []*Attempt{},
 		successful:  false,
+		task:        t,
 	}
 }

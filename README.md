@@ -92,11 +92,13 @@ func (myTask *myTask) Fail(result *task.Result) {
 
 | 参数                | 类型   | 描述                                                         |
 | ------------------- | ------ | ------------------------------------------------------------ |
+| MaxTaskNum          | Int    | 单个 taskPool 实例能缓存的任务数量上限，默认为 1000。  |
+| MaxBlockSec         | Int    | 如果 taskPool 任务数量已达数量上限，调用者在 PushTask 方法上的最大阻塞时间，默认为 60 秒。<br/>如果超过这个时间后任务数量没有空余，PushTask 方法会抛出TimeoutException。如果将该值设为0，当任务数量无法得到满足时，PushTask 方法会立即抛出 TimeoutException。如果您希望 PushTask 方法一直阻塞直到任务数量得到满足，可将该值设为负数。 |
 | MaxIoWorkerNum      | Int64  | 单个 taskPool 能并发的最多groutine的数量，默认为50，该参数用户可以根据自己实际服务器的性能去配置。 |
-| LingerMs            | Int64  | 一个 task 从创建到可发送的逗留时间，默认为 2 秒，最小可设置成 100 毫秒。 |
 | MaxRetryTimes       | Int    | 如果某个 task 首次执行失败，能够对其重试的次数，默认为 10 次。<br/>如果 retries 小于等于 0，该 ProducerBatch 首次发送失败后将直接进入失败队列。 |
 | MaxReservedAttempts | Int    | 每个 task 每次被尝试执行都对应着一个 Attemp，此参数用来控制返回给用户的 attempt 个数，默认只保留最近的 11 次 attempt 信息。<br/>该参数越大能让您追溯更多的信息，但同时也会消耗更多的内存。 |
 | BaseRetryBackOffMs  | Int64  | 首次重试的退避时间，默认为 100 毫秒。 taskPool 采样指数退避算法，第 N 次重试的计划等待时间为 baseRetryBackOffMs * 2^(N-1)。 |
 | MaxRetryBackOffMs   | Int64  | 重试的最大退避时间，默认为 50 秒。                           |
+
 ## 问题反馈
-如果您在使用过程中遇到了问题，可以创建 [GitHub Issue](<https://github.com/overtalk/task>)。
+如果您在使用过程中遇到了问题，可以创建 [GitHub Issue](<https://github.com/overtalk/task/issues>)。

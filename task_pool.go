@@ -1,18 +1,26 @@
 package task
 
 import (
+	"errors"
 	"sync"
+	"sync/atomic"
 	"time"
+)
+
+var (
+	IllegalStateExceptionErr = errors.New("IllegalStateException")
+	TimeoutExceptionErr      = errors.New("TimeoutException")
 )
 
 type TaskPool struct {
 	lock                 sync.RWMutex
 	taskPoolShutDownFlag bool
-	lingerMs             int64
 	factory              *taskFactory
 	queue                []*task
 	retryQueue           *retryQueue
 	ioWorker             *ioWorker
+	maxTaskNum           int
+	MaxBlockSec          int
 	// wg
 	retryQueueWait *sync.WaitGroup
 	taskPoolWait   *sync.WaitGroup
@@ -23,11 +31,11 @@ func NewTaskPool(c *Config) (*TaskPool, error) {
 	taskPool := &TaskPool{
 		lock:                 sync.RWMutex{},
 		taskPoolShutDownFlag: false,
+		maxTaskNum:           c.MaxTaskNum,
 		queue:                []*task{},
 		retryQueueWait:       &sync.WaitGroup{},
 		taskPoolWait:         &sync.WaitGroup{},
 		ioWorkerWait:         &sync.WaitGroup{},
-		lingerMs:             c.LingerMs,
 	}
 
 	factory := newTaskFactory(c)
@@ -50,6 +58,26 @@ func (taskPool *TaskPool) Start() {
 	go taskPool.start()
 }
 
+// Limited closing transfer parameter nil, safe closing transfer timeout time, timeout Ms parameter in milliseconds
+func (taskPool *TaskPool) Close(timeoutMs int64) error {
+	startCloseTime := time.Now().Unix()
+	taskPool.retryQueue.retryQueueShutDownFlag = true
+	taskPool.retryQueueWait.Wait()
+	taskPool.taskPoolShutDownFlag = true
+	for {
+		taskCount := atomic.LoadInt64(&taskPool.ioWorker.taskCount)
+		if taskCount != 0 && time.Now().Unix()-startCloseTime <= timeoutMs {
+			time.Sleep(time.Second)
+		} else if taskCount == 0 && len(taskPool.queue) == 0 {
+			return nil
+		} else if time.Now().Unix()-startCloseTime > timeoutMs {
+			return IllegalStateExceptionErr
+		} else {
+			time.Sleep(time.Second)
+		}
+	}
+}
+
 func (taskPool *TaskPool) SafeClose() {
 	taskPool.retryQueue.retryQueueShutDownFlag = true
 	taskPool.retryQueueWait.Wait()
@@ -58,8 +86,13 @@ func (taskPool *TaskPool) SafeClose() {
 	taskPool.ioWorkerWait.Wait()
 }
 
-func (taskPool *TaskPool) PushTask(task Task) {
+func (taskPool *TaskPool) PushTask(task Task) error {
+	if err := taskPool.waitTime(); err != nil {
+		return err
+	}
+
 	taskPool.pushTask(taskPool.factory.produce(task))
+	return nil
 }
 
 func (taskPool *TaskPool) pushTask(task *task) {
@@ -74,6 +107,10 @@ func (taskPool *TaskPool) popTask() *task {
 	task := taskPool.queue[0]
 	taskPool.queue = taskPool.queue[1:]
 	return task
+}
+
+func (taskPool *TaskPool) taskNum() int {
+	return 0
 }
 
 func (taskPool *TaskPool) start() {
@@ -103,7 +140,7 @@ func (taskPool *TaskPool) retry() {
 		retryTaskList := taskPool.retryQueue.getRetryTaskList()
 		if retryTaskList == nil {
 			// If there is nothing to send in the retry queue, just wait for the minimum time that was given to me last time.
-			time.Sleep(time.Duration(taskPool.lingerMs) * time.Millisecond)
+			time.Sleep(100 * time.Millisecond)
 		} else {
 			count := len(retryTaskList)
 			for i := 0; i < count; i++ {
@@ -120,4 +157,30 @@ func (taskPool *TaskPool) retry() {
 	}
 
 	taskPool.retryQueue.retryQueueWait.Done()
+}
+
+func (taskPool *TaskPool) waitTime() error {
+	if taskPool.MaxBlockSec > 0 {
+		for i := 0; i < taskPool.MaxBlockSec; i++ {
+			if taskPool.taskNum() > taskPool.maxTaskNum {
+				time.Sleep(time.Second)
+			} else {
+				return nil
+			}
+		}
+		return TimeoutExceptionErr
+	} else if taskPool.MaxBlockSec == 0 {
+		if taskPool.taskNum() > taskPool.maxTaskNum {
+			return TimeoutExceptionErr
+		}
+	} else if taskPool.MaxBlockSec < 0 {
+		for {
+			if taskPool.taskNum() > taskPool.maxTaskNum {
+				time.Sleep(time.Second)
+			} else {
+				return nil
+			}
+		}
+	}
+	return nil
 }

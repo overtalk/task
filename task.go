@@ -46,7 +46,7 @@ func (taskFactory *taskFactory) produce(t Task) *task {
 		maxRetryIntervalInMs: taskFactory.maxRetryIntervalInMs,
 		createTimeMs:         getTimeMs(),
 		nextRetryMs:          0,
-		result:               initResult(),
+		result:               initResult(t),
 		task:                 t,
 	}
 }
