@@ -2,14 +2,12 @@ package task
 
 type Task interface {
 	Execute() error
-	Success(result *Result)
-	Fail(result *Result)
+	CallBack(result *Result)
 }
 
 // task is used in the project
 type task struct {
 	attemptCount         int     // 尝试次数
-	maxReservedAttempts  int     // 最大剩余尝试次数
 	maxRetryTimes        int     // 最大尝试次数
 	baseRetryBackOffMs   int64   // 首次重试的退避时间
 	maxRetryIntervalInMs int64   // 重试的最大退避时间，默认为 50 秒
@@ -22,7 +20,6 @@ type task struct {
 // *************************
 // task factory
 type taskFactory struct {
-	maxReservedAttempts  int   // 最大剩余尝试次数
 	maxRetryTimes        int   // 最大尝试次数
 	baseRetryBackOffMs   int64 // 首次重试的退避时间
 	maxRetryIntervalInMs int64 // 重试的最大退避时间，默认为 50 秒
@@ -30,7 +27,6 @@ type taskFactory struct {
 
 func newTaskFactory(c *Config) *taskFactory {
 	return &taskFactory{
-		maxReservedAttempts:  c.MaxReservedAttempts,
 		maxRetryTimes:        c.MaxRetryTimes,
 		baseRetryBackOffMs:   c.BaseRetryBackOffMs,
 		maxRetryIntervalInMs: c.MaxRetryBackOffMs,
@@ -40,7 +36,6 @@ func newTaskFactory(c *Config) *taskFactory {
 func (taskFactory *taskFactory) produce(t Task) *task {
 	return &task{
 		attemptCount:         0,
-		maxReservedAttempts:  taskFactory.maxReservedAttempts,
 		maxRetryTimes:        taskFactory.maxRetryTimes,
 		baseRetryBackOffMs:   taskFactory.baseRetryBackOffMs,
 		maxRetryIntervalInMs: taskFactory.maxRetryIntervalInMs,

@@ -33,8 +33,7 @@ taskPool.Start() // 启动 task pool 实例
 ```go
 type Task interface {
 	Execute() error
-	Success(result *Result)
-	Fail(result *Result)
+	CallBack(result *Result)
 }
 ```
 
@@ -59,7 +58,7 @@ taskPool.SafeClose()
 ### 5.获取任务执行结果
 - taskPool 中的任务执行是异步的，所以需要用户实现 Task 接口，去获得每次执行的结果。
 
-- 实现 Task 接口需要实现其中的Success()方法和Fail()方法，两个方法分别会在任务执行成功或失败的时候去调用，两个方法会都会接收一个Result 实例，用户可以根据Result实例在CallBack回调方法中去获得每次任务执行的结果。下面写了一个简单的使用样例。
+- 实现 Task 接口需要实现其中的Execute()方法和CallBack()方法，两个方法分别会在任务执行成功或失败的时候去调用，两个方法会都会接收一个Result 实例，用户可以根据Result实例在CallBack回调方法中去获得每次任务执行的结果。下面写了一个简单的使用样例。
 ```go
 type myTask struct {
 	name  string
@@ -77,16 +76,16 @@ func (myTask *myTask) Execute() error {
 	return nil
 }
 
-func (myTask *myTask) Success(result *task.Result) {
-	fmt.Printf("*success* [%s]! times = [%d]\n", myTask.name, myTask.times)
-}
-
-func (myTask *myTask) Fail(result *task.Result) {
-	fmt.Printf("*fail* [%s]! times = [%d]\n", myTask.name, myTask.times)
+func (myTask *myTask) CallBack(result *task.Result) {
+    if result.IsSuccessful() {
+        fmt.Printf("*success* [%s]! times = [%d]\n", myTask.name, myTask.times)
+    } else {
+        fmt.Printf("*fail* [%s]! times = [%d]\n", myTask.name, myTask.times)
+    }
 }
 ```
 
-- 用户可以根据自己的需求调用Result实例提供的方法来获取任务执行结果信息，任务每次尝试被执行都会生成attempt信息，默认会保留11次，这个数字可以根据配置参数MaxReservedAttempts进行修改。
+- 用户可以根据自己的需求调用Result实例提供的方法来获取任务执行结果信息。
 
 ## taskPool 配置详解
 
@@ -96,7 +95,6 @@ func (myTask *myTask) Fail(result *task.Result) {
 | MaxBlockSec         | Int    | 如果 taskPool 任务数量已达数量上限，调用者在 PushTask 方法上的最大阻塞时间，默认为 60 秒。<br/>如果超过这个时间后任务数量没有空余，PushTask 方法会抛出TimeoutException。如果将该值设为0，当任务数量无法得到满足时，PushTask 方法会立即抛出 TimeoutException。如果您希望 PushTask 方法一直阻塞直到任务数量得到满足，可将该值设为负数。 |
 | MaxIoWorkerNum      | Int64  | 单个 taskPool 能并发的最多groutine的数量，默认为50，该参数用户可以根据自己实际服务器的性能去配置。 |
 | MaxRetryTimes       | Int    | 如果某个 task 首次执行失败，能够对其重试的次数，默认为 10 次。<br/>如果 retries 小于等于 0，该 ProducerBatch 首次发送失败后将直接进入失败队列。 |
-| MaxReservedAttempts | Int    | 每个 task 每次被尝试执行都对应着一个 Attemp，此参数用来控制返回给用户的 attempt 个数，默认只保留最近的 11 次 attempt 信息。<br/>该参数越大能让您追溯更多的信息，但同时也会消耗更多的内存。 |
 | BaseRetryBackOffMs  | Int64  | 首次重试的退避时间，默认为 100 毫秒。 taskPool 采样指数退避算法，第 N 次重试的计划等待时间为 baseRetryBackOffMs * 2^(N-1)。 |
 | MaxRetryBackOffMs   | Int64  | 重试的最大退避时间，默认为 50 秒。                           |
 

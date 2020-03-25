@@ -27,24 +27,16 @@ func (ioWorker *ioWorker) DoTask(t *task) {
 	atomic.AddInt64(&ioWorker.taskCount, 1)
 
 	if err := t.task.Execute(); err == nil {
-		if t.attemptCount < t.maxReservedAttempts {
-			attempt := newAttempt(true, nil)
-			t.result.attemptList = append(t.result.attemptList, attempt)
-		}
 		t.result.successful = true
-		t.task.Success(t.result)
+		t.task.CallBack(t.result)
 	} else {
 		// if the retry queue is already closed
 		if ioWorker.retryQueue.retryQueueShutDownFlag {
-			t.task.Fail(t.result)
+			t.task.CallBack(t.result)
 			return
 		}
 
 		if t.attemptCount < t.maxRetryTimes {
-			if t.attemptCount < t.maxReservedAttempts {
-				attempt := newAttempt(false, err)
-				t.result.attemptList = append(t.result.attemptList, attempt)
-			}
 			t.result.successful = false
 			t.attemptCount += 1
 			retryWaitTime := t.baseRetryBackOffMs * int64(math.Pow(2, float64(t.attemptCount)-1))
@@ -55,7 +47,7 @@ func (ioWorker *ioWorker) DoTask(t *task) {
 			}
 			ioWorker.retryQueue.sendToRetryQueue(t)
 		} else {
-			t.task.Fail(t.result)
+			t.task.CallBack(t.result)
 		}
 	}
 }

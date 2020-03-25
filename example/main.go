@@ -8,6 +8,15 @@ import (
 	"time"
 )
 
+type a interface {
+	a()
+}
+
+type B interface {
+	a
+	b()
+}
+
 type myTask struct {
 	name  string
 	times int
@@ -24,20 +33,12 @@ func (myTask *myTask) Execute() error {
 	return nil
 }
 
-func (myTask *myTask) Success(result *task.Result) {
-	fmt.Printf("*success* [%s]! times = [%d]\n", myTask.name, myTask.times)
-	//fmt.Println("result.IsSuccessful() = ", result.IsSuccessful())
-	//fmt.Println("result.GetError() = ", result.GetError())
-	//fmt.Println("result.GetTimeStampMs() = ", result.GetTimeStampMs())
-	//fmt.Println("result.GetReservedAttempts() = ", result.GetReservedAttempts())
-}
-
-func (myTask *myTask) Fail(result *task.Result) {
-	fmt.Printf("*fail* [%s]! times = [%d]\n", myTask.name, myTask.times)
-	//fmt.Println("result.IsSuccessful() = ", result.IsSuccessful())
-	//fmt.Println("result.GetError() = ", result.GetError())
-	//fmt.Println("result.GetTimeStampMs() = ", result.GetTimeStampMs())
-	//fmt.Println("result.GetReservedAttempts() = ", result.GetReservedAttempts())
+func (myTask *myTask) CallBack(result *task.Result) {
+	if result.IsSuccessful() {
+		fmt.Printf("*success* [%s]! times = [%d]\n", myTask.name, myTask.times)
+	} else {
+		fmt.Printf("*fail* [%s]! times = [%d]\n", myTask.name, myTask.times)
+	}
 }
 
 func main() {
